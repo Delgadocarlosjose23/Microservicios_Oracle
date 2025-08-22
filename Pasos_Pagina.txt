@@ -1,0 +1,82 @@
+mkdir -p microservices/{gateway,users-service,products-service,reports-service,frontend}
+touch microservices/docker-compose.yml
+touch microservices/model.jdl
+
+--------------------------------------------------------------
+
+server:
+  port: 8081   # Cada microservicio debe tener un puerto diferente
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb  # Base de datos en memoria para pruebas rápidas
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+--------------------------------------------------------------
+
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: users
+          uri: http://users-service:8081
+          predicates:
+            - Path=/users/**
+        - id: products
+          uri: http://products-service:8082
+          predicates:
+            - Path=/products/**
+        - id: reports
+          uri: http://reports-service:8083
+          predicates:
+            - Path=/reports/**
+
+--------------------------------------------------------------
+
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY target/users-service-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8081
+ENTRYPOINT ["java","-jar","app.jar"]
+
+--------------------------------------------------------------
+version: '3.8'
+services:
+  users-service:
+    build: ./users-service
+    ports:
+      - "8081:8081"
+  products-service:
+    build: ./products-service
+    ports:
+      - "8082:8082"
+  reports-service:
+    build: ./reports-service
+    ports:
+      - "8083:8083"
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - users-service
+      - products-service
+      - reports-service
+---------------------------------------------------------
+ng new frontend --routing --style=scss
+cd frontend
+ng serve
+-------------------------------------------------------
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:8080'
+};
