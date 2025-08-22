@@ -108,3 +108,89 @@ public class User {
 }
 
 
+2.3 Crear el controlador UserController
+
+Ruta: users-service/src/main/java/com/example/usersdomain/UserController.java
+
+package com.example.usersdomain;
+
+import org.springframework.web.bind.annotation.*;
+import java.util.ArrayList;
+import java.util.List;
+
+@RestController
+@RequestMapping("/users")
+public class UserController {
+
+    private List<User> users = new ArrayList<>();
+
+    @GetMapping
+    public List<User> getUsers() {
+        return users;
+    }
+
+    @PostMapping
+    public User addUser(@RequestBody User user) {
+        users.add(user);
+        return user;
+    }
+}
+
+
+👉 Esto crea:
+
+GET /users → devuelve todos los usuarios.
+
+POST /users → agrega un usuario.
+
+2.4 Configuración del microservicio (application.yml)
+
+Ruta: users-service/src/main/resources/application.yml
+
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+
+Esto hace que el servicio corra en el puerto 8081 con una base de datos en memoria.
+
+2.5 Probar el microservicio
+
+Desde la terminal, estando en la carpeta users-service:
+
+mvn spring-boot:run
+
+
+Luego abre en el navegador:
+👉 http://localhost:8081/users → te dará un JSON vacío []
+👉 Con Postman o curl, puedes hacer un POST:
+
+curl -X POST http://localhost:8081/users \
+     -H "Content-Type: application/json" \
+     -d '{"name": "Jose", "email": "jose@example.com"}'
+
+
+Y ya tendrás tu primer usuario en memoria.
+
+2.6 Repetir para products-service y reports-service
+
+Cambias User → Product o Report.
+
+Cambias el puerto (8082 para productos, 8083 para reportes).
+
+El código del controlador es igual, solo cambia el tipo de entidad.
+
+✅ Con esto terminas el Paso 2: ya tienes 3 microservicios funcionando por separado, cada uno con su endpoint REST.
+
+👉 Pregunta clave para ti:
+¿Quieres que te haga el código completo de los 3 microservicios (users, products, reports) listo para copiar y pegar?
