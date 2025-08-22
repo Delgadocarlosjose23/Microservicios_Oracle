@@ -1,196 +1,280 @@
-mkdir -p microservices/{gateway,users-service,products-service,reports-service,frontend}
-touch microservices/docker-compose.yml
-touch microservices/model.jdl
+Desde la carpeta raíz microservices/:
 
---------------------------------------------------------------
+mkdir -p products-service/src/main/java/com/example/productsdomain
+mkdir -p products-service/src/main/resources
+
+
+Te debe quedar así:
+
+microservices/
+└── products-service/
+    ├── pom.xml
+    ├── Dockerfile
+    └── src/
+        ├── main/
+        │   ├── java/
+        │   │   └── com/example/productsdomain/
+        │   │       ├── ProductsServiceApplication.java
+        │   │       ├── Product.java
+        │   │       └── ProductController.java
+        │   └── resources/
+        │       └── application.yml
+
+1) pom.xml (va en products-service/pom.xml)
+
+Mínimo para exponer un API REST y empaquetar con Spring Boot.
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>products-service</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>products-service</name>
+  <description>Products microservice</description>
+
+  <properties>
+    <java.version>17</java.version>
+    <spring-boot.version>3.5.5</spring-boot.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- API REST -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- Validaciones opcionales (@NotBlank, etc.) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+
+    <!-- Para reducir logs/ruido en pruebas -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- Lombok opcional (si lo usas, recuerda activar annotation processing) -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Tests (no imprescindibles para la demo) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Empaqueta jar ejecutable -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+
+2) application.yml (va en products-service/src/main/resources/application.yml)
+
+Puerto propio y nombre del servicio.
 
 server:
-  port: 8081   # Cada microservicio debe tener un puerto diferente
+  port: 8082
 
 spring:
-  datasource:
-    url: jdbc:h2:mem:testdb  # Base de datos en memoria para pruebas rápidas
-    driverClassName: org.h2.Driver
-    username: sa
-    password:
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
+  application:
+    name: products-service
 
---------------------------------------------------------------
 
-server:
-  port: 8080
+Más adelante, si quieres BD, aquí agregas spring.datasource y spring.jpa. Por ahora lo haremos en memoria para ir rápido en clase.
+
+3) Clase principal (va en products-service/src/main/java/com/example/productsdomain/ProductsServiceApplication.java)
+package com.example.productsdomain;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ProductsServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ProductsServiceApplication.class, args);
+    }
+}
+
+4) Modelo Product (va en .../Product.java)
+
+Sencillo, sin JPA para no depender de DB.
+
+package com.example.productsdomain;
+
+public class Product {
+    private Long id;
+    private String name;
+    private Double price;
+
+    public Product() {}
+
+    public Product(Long id, String name, Double price) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public Double getPrice() { return price; }
+    public void setPrice(Double price) { this.price = price; }
+}
+
+5) Controlador ProductController (va en .../ProductController.java)
+
+CRUD en memoria (rápido para la demo). Auto-increment con AtomicLong.
+
+package com.example.productsdomain;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+@RestController
+@RequestMapping("/products")
+public class ProductController {
+
+    private final Map<Long, Product> db = new ConcurrentHashMap<>();
+    private final AtomicLong seq = new AtomicLong(0);
+
+    public ProductController() {
+        // Semillas para probar de una
+        create(new Product(null, "Laptop", 1200.0));
+        create(new Product(null, "Mouse", 25.0));
+    }
+
+    @GetMapping
+    public Collection<Product> list() {
+        return db.values();
+    }
+
+    @GetMapping("/{id}")
+    public Product get(@PathVariable Long id) {
+        Product p = db.get(id);
+        if (p == null) throw new NoSuchElementException("Product " + id + " not found");
+        return p;
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Product create(@RequestBody Product product) {
+        long id = seq.incrementAndGet();
+        product.setId(id);
+        db.put(id, product);
+        return product;
+    }
+
+    @PutMapping("/{id}")
+    public Product update(@PathVariable Long id, @RequestBody Product product) {
+        if (!db.containsKey(id)) throw new NoSuchElementException("Product " + id + " not found");
+        product.setId(id);
+        db.put(id, product);
+        return product;
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        db.remove(id);
+    }
+}
+
+
+Para errores más “bonitos”, luego agregamos un @ControllerAdvice. Por ahora, directo y a matar.
+
+6) Dockerfile (va en products-service/Dockerfile)
+
+Para ejecutar en contenedor fácilmente.
+
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY target/products-service-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8082
+ENTRYPOINT ["java","-jar","app.jar"]
+
+7) Compilar y correr
+Local (sin Docker)
+
+Desde microservices/products-service:
+
+mvn clean package -DskipTests
+java -jar target/products-service-0.0.1-SNAPSHOT.jar
+
+
+Verás en logs que levanta en :8082.
+
+Probar con curl
+# Listar
+curl http://localhost:8082/products
+
+# Crear
+curl -X POST http://localhost:8082/products \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Teclado","price":15.5}'
+
+# Ver uno
+curl http://localhost:8082/products/1
+
+# Actualizar
+curl -X PUT http://localhost:8082/products/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Laptop Gamer","price":1800.0}'
+
+# Borrar
+curl -X DELETE http://localhost:8082/products/1 -i
+
+Con Docker
+mvn clean package -DskipTests
+docker build -t products-service:dev .
+docker run --rm -p 8082:8082 products-service:dev
+
+8) Conectar en el Gateway (cuando lo tengas)
+
+En gateway/src/main/resources/application.yml agrega una ruta:
 
 spring:
   cloud:
     gateway:
       routes:
-        - id: users
-          uri: http://users-service:8081
-          predicates:
-            - Path=/users/**
         - id: products
-          uri: http://products-service:8082
+          uri: http://products-service:8082   # nombre del servicio en docker-compose
           predicates:
             - Path=/products/**
-        - id: reports
-          uri: http://reports-service:8083
-          predicates:
-            - Path=/reports/**
-
---------------------------------------------------------------
-
-FROM openjdk:17-jdk-slim
-WORKDIR /app
-COPY target/users-service-0.0.1-SNAPSHOT.jar app.jar
-EXPOSE 8081
-ENTRYPOINT ["java","-jar","app.jar"]
-
---------------------------------------------------------------
-version: '3.8'
-services:
-  users-service:
-    build: ./users-service
-    ports:
-      - "8081:8081"
-  products-service:
-    build: ./products-service
-    ports:
-      - "8082:8082"
-  reports-service:
-    build: ./reports-service
-    ports:
-      - "8083:8083"
-  gateway:
-    build: ./gateway
-    ports:
-      - "8080:8080"
-    depends_on:
-      - users-service
-      - products-service
-      - reports-service
----------------------------------------------------------
-ng new frontend --routing --style=scss
-cd frontend
-ng serve
--------------------------------------------------------
-export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:8080'
-};
 
 
-
--------------------------------------------------------------
-package com.example.usersdomain;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-
-@Entity
-public class User {
-    @Id
-    @GeneratedValue
-    private Long id;
-    private String name;
-    private String email;
-
-    // Getters y setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-}
-
-
-2.3 Crear el controlador UserController
-
-Ruta: users-service/src/main/java/com/example/usersdomain/UserController.java
-
-package com.example.usersdomain;
-
-import org.springframework.web.bind.annotation.*;
-import java.util.ArrayList;
-import java.util.List;
-
-@RestController
-@RequestMapping("/users")
-public class UserController {
-
-    private List<User> users = new ArrayList<>();
-
-    @GetMapping
-    public List<User> getUsers() {
-        return users;
-    }
-
-    @PostMapping
-    public User addUser(@RequestBody User user) {
-        users.add(user);
-        return user;
-    }
-}
-
-
-👉 Esto crea:
-
-GET /users → devuelve todos los usuarios.
-
-POST /users → agrega un usuario.
-
-2.4 Configuración del microservicio (application.yml)
-
-Ruta: users-service/src/main/resources/application.yml
-
-server:
-  port: 8081
-
-spring:
-  datasource:
-    url: jdbc:h2:mem:testdb
-    driverClassName: org.h2.Driver
-    username: sa
-    password:
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-
-
-Esto hace que el servicio corra en el puerto 8081 con una base de datos en memoria.
-
-2.5 Probar el microservicio
-
-Desde la terminal, estando en la carpeta users-service:
-
-mvn spring-boot:run
-
-
-Luego abre en el navegador:
-👉 http://localhost:8081/users → te dará un JSON vacío []
-👉 Con Postman o curl, puedes hacer un POST:
-
-curl -X POST http://localhost:8081/users \
-     -H "Content-Type: application/json" \
-     -d '{"name": "Jose", "email": "jose@example.com"}'
-
-
-Y ya tendrás tu primer usuario en memoria.
-
-2.6 Repetir para products-service y reports-service
-
-Cambias User → Product o Report.
-
-Cambias el puerto (8082 para productos, 8083 para reportes).
-
-El código del controlador es igual, solo cambia el tipo de entidad.
-
-✅ Con esto terminas el Paso 2: ya tienes 3 microservicios funcionando por separado, cada uno con su endpoint REST.
-
-👉 Pregunta clave para ti:
-¿Quieres que te haga el código completo de los 3 microservicios (users, products, reports) listo para copiar y pegar?
+Si aún no usas Docker Compose, mientras tanto puedes apuntar a http://localhost:8082.
