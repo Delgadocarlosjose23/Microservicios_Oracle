@@ -278,3 +278,47 @@ spring:
 
 
 Si aún no usas Docker Compose, mientras tanto puedes apuntar a http://localhost:8082.
+
+
+
++---------------------------------------------+--------------------------------------------+
+
+Ejemplo comando (si usas Spring Boot CLI):
+
+spring init -d=cloud-gateway,actuator -g=com.example -a=gateway gateway
+
+
+Eso te genera la carpeta gateway/.
+
+2️⃣ Configuración en application.yml
+
+📂 gateway/src/main/resources/application.yml
+
+server:
+  port: 8080   # El gateway escucha en este puerto
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        # Ruta para Users Service
+        - id: users-service
+          uri: http://users-service:8081
+          predicates:
+            - Path=/users/**
+
+        # Ruta para Products Service
+        - id: products-service
+          uri: http://products-service:8082
+          predicates:
+            - Path=/products/**
+
+        # Ruta para Reports Service
+        - id: reports-service
+          uri: http://reports-service:8083
+          predicates:
+            - Path=/reports/**
+
